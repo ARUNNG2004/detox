@@ -3,4 +3,5 @@
     <string name="app_name">detox</string>
     <string name="accessibility_service_label">Detox App Blocker</string>
     <string name="accessibility_service_description">This service helps block app usage during detox sessions by detecting navigation attempts.</string>
+    <string name="foreground_service_description">Your description here</string>
 </resources>

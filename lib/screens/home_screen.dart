@@ -183,9 +183,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: _overlayPermissionGranted ? Colors.green : Colors.orange,
                     ),
                     onTap: !_overlayPermissionGranted ? () async {
+                      try {
                         await DetoxService.requestOverlayPermission();
-                        // Re-check after user returns from settings
-                        Future.delayed(const Duration(seconds: 1), () => _checkPermissions(showLoading: false));
+                        // Add a slight delay before checking the permission status
+                        await Future.delayed(const Duration(milliseconds: 500));
+                        await _checkPermissions(showLoading: false);
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to request permission: $e')),
+                          );
+                        }
+                      }
                     } : null,
                   ),
                   ListTile(

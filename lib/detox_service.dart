@@ -1,55 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart'; // For kDebugMode
 
 class DetoxService {
   static const platform = MethodChannel('com.example.detox/detox_service');
 
-  static Future<void> startDetoxService() async {
-    try {
-      if (kDebugMode) {
-        print('Flutter: Calling startDetoxService');
-      }
-      await platform.invokeMethod('startDetoxService');
-    } on PlatformException catch (e) {
-      if (kDebugMode) {
-        print("Failed to start detox service: '${e.message}'.");
-      }
-      // Handle error appropriately
-    }
-  }
-
-  static Future<void> stopDetoxService() async {
-    try {
-      if (kDebugMode) {
-        print('Flutter: Calling stopDetoxService');
-      }
-      await platform.invokeMethod('stopDetoxService');
-    } on PlatformException catch (e) {
-      if (kDebugMode) {
-        print("Failed to stop detox service: '${e.message}'.");
-      }
-      // Handle error appropriately
-    }
-  }
-
-  static Future<void> setBlockingActive(bool isActive) async {
-    try {
-      if (kDebugMode) {
-        print('Flutter: Calling setBlockingActive with $isActive');
-      }
-      await platform.invokeMethod('setBlockingActive', {'isActive': isActive});
-    } on PlatformException catch (e) {
-      if (kDebugMode) {
-        print("Failed to set blocking active: '${e.message}'.");
-      }
-      // Handle error appropriately
-    }
-  }
-
   static Future<bool> isOverlayPermissionGranted() async {
     try {
       if (kDebugMode) {
-        print('Flutter: Calling isOverlayPermissionGranted');
+        print('Flutter: Checking overlay permission');
       }
       final bool isGranted = await platform.invokeMethod('isOverlayPermissionGranted');
       return isGranted;
@@ -57,52 +15,111 @@ class DetoxService {
       if (kDebugMode) {
         print("Failed to check overlay permission: '${e.message}'.");
       }
-      return false; // Assume not granted on error
+      return false;
     }
   }
 
   static Future<void> requestOverlayPermission() async {
     try {
       if (kDebugMode) {
-        print('Flutter: Calling requestOverlayPermission');
+        print('Flutter: Requesting overlay permission');
       }
       await platform.invokeMethod('requestOverlayPermission');
-      // Note: Actual grant status needs to be checked again after user interaction
     } on PlatformException catch (e) {
       if (kDebugMode) {
         print("Failed to request overlay permission: '${e.message}'.");
       }
-      // Handle error appropriately
+      rethrow;
     }
   }
 
   static Future<bool> isAccessibilityServiceEnabled() async {
     try {
-      if (kDebugMode) {
-        print('Flutter: Calling isAccessibilityServiceEnabled');
-      }
       final bool isEnabled = await platform.invokeMethod('isAccessibilityServiceEnabled');
       return isEnabled;
     } on PlatformException catch (e) {
       if (kDebugMode) {
         print("Failed to check accessibility service: '${e.message}'.");
       }
-      return false; // Assume not enabled on error
+      return false;
     }
   }
 
   static Future<void> requestAccessibilityPermission() async {
     try {
-      if (kDebugMode) {
-        print('Flutter: Calling requestAccessibilityPermission');
-      }
       await platform.invokeMethod('requestAccessibilityPermission');
-      // Note: Actual enabled status needs to be checked again after user interaction
     } on PlatformException catch (e) {
       if (kDebugMode) {
         print("Failed to request accessibility permission: '${e.message}'.");
       }
-      // Handle error appropriately
+      rethrow;
+    }
+  }
+
+  static Future<void> startDetoxService() async {
+    try {
+      await platform.invokeMethod('startDetoxService');
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        print("Failed to start detox service: '${e.message}'.");
+      }
+      rethrow;
+    }
+  }
+
+  static Future<void> stopDetoxService() async {
+    try {
+      await platform.invokeMethod('stopDetoxService');
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        print("Failed to stop detox service: '${e.message}'.");
+      }
+      rethrow;
+    }
+  }
+
+  static Future<void> setBlockingActive(bool active) async {
+    try {
+      await platform.invokeMethod('setBlockingActive', {'active': active});
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        print("Failed to set blocking active: '${e.message}'.");
+      }
+      rethrow;
+    }
+  }
+
+  static Future<bool> isScreenPinningActive() async {
+    try {
+      final bool isActive = await platform.invokeMethod('isScreenPinningActive');
+      return isActive;
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        print("Failed to check screen pinning status: '${e.message}'.");
+      }
+      return false;
+    }
+  }
+
+  static Future<void> startScreenPinning() async {
+    try {
+      await platform.invokeMethod('startScreenPinning');
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        print("Failed to start screen pinning: '${e.message}'.");
+      }
+      rethrow;
+    }
+  }
+
+  static Future<void> stopScreenPinning() async {
+    try {
+      await platform.invokeMethod('stopScreenPinning');
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        print("Failed to stop screen pinning: '${e.message}'.");
+      }
+      rethrow;
     }
   }
 }

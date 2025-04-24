@@ -30,8 +30,18 @@ class _BlackoutScreenState extends State<BlackoutScreen> with WidgetsBindingObse
       _updateRemainingTime();
     });
 
-    // Ensure blocking is active and UI is immersive
-    DetoxService.setBlockingActive(true);
+    // Start all protection mechanisms
+    _initializeProtection();
+  }
+
+  Future<void> _initializeProtection() async {
+    // Ensure blocking is active
+    await DetoxService.setBlockingActive(true);
+
+    // Start screen pinning
+    await DetoxService.startScreenPinning();
+
+    // Enter immersive mode
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
@@ -58,6 +68,9 @@ class _BlackoutScreenState extends State<BlackoutScreen> with WidgetsBindingObse
     _timer?.cancel();
     _tapTimer?.cancel();
 
+    // Stop screen pinning
+    await DetoxService.stopScreenPinning();
+
     // Restore normal UI mode
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
@@ -69,17 +82,10 @@ class _BlackoutScreenState extends State<BlackoutScreen> with WidgetsBindingObse
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('flutter.isDetoxActive', false);
 
-    // Navigate back to HomeScreen only if mounted
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
+      Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
-      if (!sessionEndedNormally) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('Emergency exit activated.'), duration: Duration(seconds: 2)),
-         );
-      }
     }
   }
 
