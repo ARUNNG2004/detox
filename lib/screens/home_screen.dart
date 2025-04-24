@@ -1,10 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../services/schedule_service.dart';
-import 'schedule_screen.dart';
-import '../widgets/blackout_lock_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart'; // For date/time formatting
+import '../detox_service.dart'; // Import the platform channel wrapper
+import 'blackout_screen.dart'; // Keep for navigation later
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,192 +11,219 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  bool _isLockScreenPresented = false;
-  VoidCallback? _scheduleListener;
-  ScheduleService? _scheduleServiceInstance;
-
+class _HomeScreenState extends State<HomeScreen> {
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+  bool _isLoading = false;
+  bool _overlayPermissionGranted = false;
+  bool _accessibilityServiceEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _loadInitialTimes();
+    _checkPermissions();
+    // TODO: Consider if periodic check is still needed or if BlackoutScreen handles duration
+  }
+
+  Future<void> _loadInitialTimes() async {
+    setState(() => _isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    final startTimeMillis = prefs.getInt('startTimeMillis');
+    final endTimeMillis = prefs.getInt('endTimeMillis');
+
+    if (startTimeMillis != null) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(startTimeMillis);
+      _startTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
+    }
+    if (endTimeMillis != null) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(endTimeMillis);
+      _endTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _checkPermissions({bool showLoading = true}) async {
+    if (showLoading && mounted) setState(() => _isLoading = true);
+    _overlayPermissionGranted = await DetoxService.isOverlayPermissionGranted();
+    _accessibilityServiceEnabled = await DetoxService.isAccessibilityServiceEnabled();
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _selectTime(BuildContext context, bool isStartTime) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: isStartTime ? (_startTime ?? TimeOfDay.now()) : (_endTime ?? TimeOfDay.now()),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        if (isStartTime) {
+          _startTime = picked;
+        } else {
+          _endTime = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _saveTimesAndStartDetox() async {
+    if (_startTime == null || _endTime == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select both start and end times.')),
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final startDateTime = DateTime(now.year, now.month, now.day, _startTime!.hour, _startTime!.minute);
+    DateTime endDateTime = DateTime(now.year, now.month, now.day, _endTime!.hour, _endTime!.minute);
+
+    // Handle end time crossing midnight
+    if (endDateTime.isBefore(startDateTime) || endDateTime.isAtSameMomentAs(startDateTime)) {
+      endDateTime = endDateTime.add(const Duration(days: 1));
+    }
+
+    // Check permissions again before starting
+    await _checkPermissions(showLoading: true);
+    if (!_overlayPermissionGranted || !_accessibilityServiceEnabled) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please grant Overlay and Accessibility permissions first.')),
+      );
+      return;
+    }
+
+    if (mounted) setState(() => _isLoading = true);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('startTimeMillis', startDateTime.millisecondsSinceEpoch);
+    await prefs.setInt('endTimeMillis', endDateTime.millisecondsSinceEpoch);
+    await prefs.setBool('flutter.isDetoxActive', true); // For BootReceiver
+
+    try {
+      await DetoxService.startDetoxService();
+      await DetoxService.setBlockingActive(true);
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => BlackoutScreen(endTime: endDateTime)),
+      );
+
+    } catch (e) {
+      print('Error starting detox: $e');
       if (mounted) {
-        final scheduleService = context.read<ScheduleService>();
-        if (scheduleService.isBlackoutActive && !_isLockScreenPresented) {
-          _navigateToLockScreen(scheduleService);
-        }
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('Error starting detox: $e')),
+         );
       }
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final scheduleService = Provider.of<ScheduleService>(context, listen: false);
-    if (scheduleService != _scheduleServiceInstance || _scheduleListener == null) {
-      if (_scheduleServiceInstance != null && _scheduleListener != null) {
-        _scheduleServiceInstance!.removeListener(_scheduleListener!);
-      }
-      _scheduleServiceInstance = scheduleService;
-      _scheduleListener = () {
-        if (!mounted) return;
-        final bool isActive = _scheduleServiceInstance!.isBlackoutActive;
-        print("Listener: isActive = $isActive, isPresented = $_isLockScreenPresented"); // Debug
-        if (isActive && !_isLockScreenPresented) {
-          _navigateToLockScreen(_scheduleServiceInstance!);
-        } else if (!isActive && _isLockScreenPresented) {
-          // Reset flag if state becomes inactive externally. Pop is handled by LockScreen / .then()
-          setState(() { _isLockScreenPresented = false; });
-        }
-      };
-      _scheduleServiceInstance!.addListener(_scheduleListener!);
+      // Clear active state if start failed
+      await prefs.setBool('flutter.isDetoxActive', false);
     }
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    if (_scheduleServiceInstance != null && _scheduleListener != null) {
-      _scheduleServiceInstance!.removeListener(_scheduleListener!);
-    }
-    _scheduleListener = null;
-    _scheduleServiceInstance = null;
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (!mounted) return;
-    if (state == AppLifecycleState.resumed) {
-      final scheduleService = context.read<ScheduleService>();
-      final bool isActive = scheduleService.isBlackoutActive;
-      if (isActive && !_isLockScreenPresented) {
-        _navigateToLockScreen(scheduleService);
-      }
-    }
-  }
-
-  void _navigateToLockScreen(ScheduleService schedule) {
-    if (!mounted || _isLockScreenPresented) return;
-    setState(() { _isLockScreenPresented = true; });
-    final Duration remainingDuration = _calculateRemainingDuration(schedule);
-    print("Navigating to Lock Screen. Duration: $remainingDuration"); // Debug
-    Navigator.push( context,
-      MaterialPageRoute( builder: (context) => BlackoutLockScreen(duration: remainingDuration)),
-    ).then((_) {
-      print("Returned from Lock Screen"); // Debug
-      if (mounted) { setState(() { _isLockScreenPresented = false; }); }
-    });
-  }
-
-  Duration _calculateRemainingDuration(ScheduleService schedule) {
-    if (schedule.end == null) return Duration.zero;
+  String _formatTime(TimeOfDay? time) {
+    if (time == null) return 'Not Set';
     final now = DateTime.now();
-    final end = schedule.end!;
-    DateTime endDt = DateTime(now.year, now.month, now.day, end.hour, end.minute);
-    bool isOvernight = schedule.start != null && (schedule.start!.hour * 60 + schedule.start!.minute) > (end.hour * 60 + end.minute);
-    if (isOvernight && endDt.isBefore(now)) { endDt = endDt.add(const Duration(days: 1)); }
-    else if (!isOvernight && endDt.isBefore(now)) { return Duration.zero; }
-    return endDt.isAfter(now) ? endDt.difference(now) : Duration.zero;
-  }
-
-  void _navigateToScheduleScreen() {
-    if (!_isLockScreenPresented) {
-      Navigator.push( context, MaterialPageRoute(builder: (context) => const ScheduleScreen()));
-    }
-  }
-
-  void _startQuickSet(Duration duration) {
-    if (_isLockScreenPresented) return;
-    final scheduleService = context.read<ScheduleService>();
-    final now = DateTime.now();
-    final startTime = TimeOfDay.fromDateTime(now);
-    final endTime = TimeOfDay.fromDateTime(now.add(duration));
-    scheduleService.saveSchedule(startTime, endTime, isQuickSet: true); // Listener will trigger navigation
-    ScaffoldMessenger.of(context).showSnackBar( SnackBar(
-      content: Text('Quick blackout requested for ${duration.inMinutes} min!'),
-      duration: const Duration(seconds: 2), backgroundColor: Colors.blueGrey,
-      behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
+    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    return DateFormat.jm().format(dt); // Format like '5:08 PM'
   }
 
   @override
   Widget build(BuildContext context) {
-    final schedule = context.read<ScheduleService>();
-    final manualStartTime = schedule.start;
-    final manualEndTime = schedule.end;
-    final isQuickSet = schedule.isQuickSet;
-    final initialDelay = 200.ms;
-    final itemInterval = 100.ms;
-
     return Scaffold(
-      body: Stack(
-        children: [
-          Container( decoration: BoxDecoration( gradient: LinearGradient(
-            colors: [Colors.indigo.shade50, Colors.grey.shade50],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-          ))),
-          Scaffold(
-            backgroundColor: Colors.transparent,
-            appBar: AppBar(
-              backgroundColor: Colors.indigo[700]?.withOpacity(0.95), elevation: 0, title: const Text('Digital Detox'),
-              actions: [ IconButton( icon: const Icon(Icons.timer_outlined), tooltip: 'Set Manual Schedule',
-                onPressed: _navigateToScheduleScreen,
-              ).animate().fade(delay: 500.ms).slideX(begin: 0.5),
-              ],
-            ),
-            body: SafeArea( child: Padding( padding: const EdgeInsets.all(20.0),
-              child: Column( mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (manualStartTime != null && manualEndTime != null && !isQuickSet)
-                    Padding( padding: const EdgeInsets.only(bottom: 30.0),
-                      child: Text( 'Manual Schedule:\n${manualStartTime.format(context)} - ${manualEndTime.format(context)}',
-                        textAlign: TextAlign.center, style: TextStyle( fontSize: 16, color: Theme.of(context).primaryColorDark,
-                          fontWeight: FontWeight.w500, height: 1.4,),
-                      ),
-                    ).animate().fade(delay: initialDelay).slideY(begin: 0.2)
-                  else if (!isQuickSet)
-                    const Padding( padding: EdgeInsets.only(bottom: 30.0),
-                      child: Text( 'No manual schedule set.\nUse Quick Sets or tap ↗ to create one.',
-                        textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.4),
-                      ),
-                    ).animate().fade(delay: initialDelay).slideY(begin: 0.2),
-                  const Text('Start Quick Blackout', textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600))
-                      .animate().fade(delay: initialDelay + itemInterval).slideY(begin: 0.3),
-                  const SizedBox(height: 10),
-                  const Text('(Starts immediately)', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.grey))
-                      .animate().fade(delay: initialDelay + itemInterval * 1.5).slideY(begin: 0.3),
-                  const SizedBox(height: 30),
-                  Wrap( spacing: 15.0, runSpacing: 15.0, alignment: WrapAlignment.center,
+      appBar: AppBar(
+        title: const Text('Detox Setup'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text('Select Detox Period', style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildQuickSetButton(const Duration(minutes: 1), '1 Min'),
-                      _buildQuickSetButton(const Duration(minutes: 5), '5 Min'),
-                      _buildQuickSetButton(const Duration(minutes: 10), '10 Min'),
-                      _buildQuickSetButton(const Duration(minutes: 30), '30 Min'),
-                      _buildQuickSetButton(const Duration(hours: 1), '1 Hour'),
-                      _buildQuickSetButton(const Duration(hours: 3), '3 Hours'),
-                      _buildQuickSetButton(const Duration(hours: 8), '8 Hours'),
-                    ].animate(interval: itemInterval, delay: initialDelay + itemInterval * 2)
-                        .fade(duration: 400.ms).slideY(begin: 0.5, duration: 400.ms, curve: Curves.easeOut),
+                      Column(
+                        children: [
+                          const Text('Start Time'),
+                          TextButton(
+                            onPressed: () => _selectTime(context, true),
+                            child: Text(_formatTime(_startTime), style: Theme.of(context).textTheme.titleLarge),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          const Text('End Time'),
+                          TextButton(
+                            onPressed: () => _selectTime(context, false),
+                            child: Text(_formatTime(_endTime), style: Theme.of(context).textTheme.titleLarge),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 30),
+                  Text('Permissions Status:', style: Theme.of(context).textTheme.titleMedium),
+                  ListTile(
+                    title: const Text('Overlay Permission'),
+                    subtitle: Text(_overlayPermissionGranted ? 'Granted' : 'Required'),
+                    trailing: Icon(
+                      _overlayPermissionGranted ? Icons.check_circle : Icons.warning_amber_rounded,
+                      color: _overlayPermissionGranted ? Colors.green : Colors.orange,
+                    ),
+                    onTap: !_overlayPermissionGranted ? () async {
+                        await DetoxService.requestOverlayPermission();
+                        // Re-check after user returns from settings
+                        Future.delayed(const Duration(seconds: 1), () => _checkPermissions(showLoading: false));
+                    } : null,
+                  ),
+                  ListTile(
+                    title: const Text('Accessibility Service'),
+                     subtitle: Text(_accessibilityServiceEnabled ? 'Enabled' : 'Required'),
+                    trailing: Icon(
+                      _accessibilityServiceEnabled ? Icons.check_circle : Icons.warning_amber_rounded,
+                      color: _accessibilityServiceEnabled ? Colors.green : Colors.orange,
+                    ),
+                     onTap: !_accessibilityServiceEnabled ? () async {
+                        await DetoxService.requestAccessibilityPermission();
+                        // Re-check after user returns from settings
+                        Future.delayed(const Duration(seconds: 1), () => _checkPermissions(showLoading: false));
+                     } : null,
+                  ),
+                   const SizedBox(height: 10),
+                  if (!_overlayPermissionGranted || !_accessibilityServiceEnabled)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text(
+                        'Tap required permission items above to grant access via system settings. The app needs these to function correctly.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange[800]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   const Spacer(),
+                  ElevatedButton(
+                    onPressed: (_startTime != null && _endTime != null && _overlayPermissionGranted && _accessibilityServiceEnabled) ? _saveTimesAndStartDetox : null,
+                    style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        backgroundColor: (_startTime != null && _endTime != null && _overlayPermissionGranted && _accessibilityServiceEnabled) ? Theme.of(context).primaryColor : Colors.grey,
+                    ),
+                    child: const Text('Start Detox Session'),
+                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
-            )),
-          ),
-        ],
       ),
     );
-  }
-
-  Widget _buildQuickSetButton(Duration duration, String label) {
-    return ElevatedButton(
-      onPressed: () => _startQuickSet(duration),
-      child: Text(label),
-    ).animate(target: 0.95, effects: [ScaleEffect(duration: 100.ms)]);
   }
 }

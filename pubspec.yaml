@@ -1,37 +1,24 @@
 name: detox
-description: "A new Flutter project."
-publish_to: 'none'
+description: "Digital Detox - Android-only enforced screen blocking"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.7.0 <4.0.0' # Using constraint from previous user input
+  sdk: ">=3.7.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
-
-  # Core dependencies
-  provider: ^6.1.2
-  shared_preferences: ^2.2.3
-  intl: ^0.19.0 # Keep user specified version
   cupertino_icons: ^1.0.8
-
-  # Animation
-  flutter_animate: ^4.5.0
-
-  # Optional but often useful
-  flutter_secure_storage: ^9.1.1 # If needed later for secure data
-  local_auth: ^2.2.0       # If needed later for biometric auth
+  shared_preferences: ^2.2.1
+  provider: ^6.1.1
+  flutter_local_notifications: ^17.0.0
+  flutter_foreground_task: ^6.1.0
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.2
+  flutter_lints: ^3.0.1
 
 flutter:
   uses-material-design: true
-  # Optional fonts section
-  # fonts:
-  #   - family: Orbitron
-  #     fonts:
-  #       - asset: fonts/Orbitron-Regular.ttf
