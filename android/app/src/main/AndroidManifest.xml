@@ -1,20 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Reorder and group permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Permissions required for Detox feature -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
-        android:protectionLevel="signature" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- Optional: To relaunch app -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
-        android:minSdkVersion="30"
-        android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.MANAGE_DEVICE_ADMINS" />
-    <uses-permission android:name="android.permission.LOCK_TASK" />
+    <!-- Add permission group and protection level -->
+    <permission-group
+        android:name="${applicationId}.permission-group"
+        android:description="@string/permission_group_description"
+        android:label="@string/permission_group_label" />
+
+    <permission
+        android:name="${applicationId}.ACCESSIBILITY_SERVICE"
+        android:protectionLevel="signature"
+        android:label="@string/accessibility_permission_label"
+        android:description="@string/accessibility_permission_description" />
     <application
         android:label="detox"
         android:name="${applicationName}"

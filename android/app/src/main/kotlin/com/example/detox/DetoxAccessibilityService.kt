@@ -11,11 +11,9 @@ import android.content.Context
 class DetoxAccessibilityService : AccessibilityService() {
 
     companion object {
-        private const val TAG = "DetoxAccessibility"
-        // Flag to control blocking logic, potentially set via Flutter
+        private const val TAG = "DigitalWellbeingService"
         var isBlockingActive = false
 
-        // Helper function to check if the service is enabled
         fun isAccessibilityServiceEnabled(context: Context): Boolean {
             val serviceId = context.packageName + "/" + DetoxAccessibilityService::class.java.canonicalName
             try {
@@ -29,7 +27,7 @@ class DetoxAccessibilityService : AccessibilityService() {
                     return settingValue?.split(':')?.contains(serviceId) ?: false
                 }
             } catch (e: Settings.SettingNotFoundException) {
-                Log.e(TAG, "Error finding setting, default accessibility to not found: ", e)
+                Log.e(TAG, "Error checking accessibility settings", e)
             }
             return false
         }
@@ -73,17 +71,13 @@ class DetoxAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        Log.i(TAG, "Accessibility Service Connected")
-        val info = AccessibilityServiceInfo()
-        // Configure the service programmatically if needed, complementing the XML config
-        info.eventTypes = AccessibilityEvent.TYPES_ALL_MASK // Listen to more events initially for debugging
-        info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-        info.flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
-                     AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-                     AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-        info.notificationTimeout = 100
+        val info = serviceInfo.apply {
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+            flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+            notificationTimeout = 100
+        }
         this.serviceInfo = info
-        // isBlockingActive = true // Activate blocking immediately or wait for Flutter command
     }
 
     override fun onUnbind(intent: Intent?): Boolean {

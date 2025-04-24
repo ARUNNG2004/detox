@@ -28,6 +28,7 @@ android {
         targetSdk = 34
         versionCode = flutterVersionCode
         versionName = flutterVersionName
+        resValue("string", "privacy_policy_url", "https://your-domain.com/privacy-policy")
     }
 
     compileOptions {
@@ -43,6 +44,12 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }

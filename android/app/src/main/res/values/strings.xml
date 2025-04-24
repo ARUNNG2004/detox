@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">detox</string>
-    <string name="accessibility_service_label">Detox App Blocker</string>
-    <string name="accessibility_service_description">This service helps block app usage during detox sessions by detecting navigation attempts.</string>
-    <string name="foreground_service_description">Your description here</string>
+    <string name="app_name">Digital Detox</string>
+    <string name="permission_group_label">Digital Wellbeing Features</string>
+    <string name="permission_group_description">Permissions required for digital wellbeing and focus features</string>
+    <string name="accessibility_permission_label">Focus Mode Service</string>
+    <string name="accessibility_permission_description">Enables focus mode features to help you stay productive</string>
+    <string name="accessibility_service_label">Digital Wellbeing Service</string>
+    <string name="accessibility_service_description">Helps maintain focus during your scheduled digital wellness sessions</string>
+    <string name="foreground_service_description">Digital wellbeing service running to maintain your focus settings</string>
 </resources>
