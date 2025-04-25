@@ -225,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: (_startTime != null && _endTime != null && _overlayPermissionGranted && _accessibilityServiceEnabled) ? _saveTimesAndStartDetox : null,
                     style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 15),
-                        backgroundColor: (_startTime != null && _endTime != null && _overlayPermissionGranted && _accessibilityServiceEnabled) ? Theme.of(context).primaryColor : Colors.grey,
+                        backgroundColor: (_startTime != null && _endTime != null && _overlayPermissionGranted && _accessibilityServiceEnabled) ? Theme.of(context).secondaryHeaderColor : Colors.grey,
                     ),
                     child: const Text('Start Detox Session'),
                   ),

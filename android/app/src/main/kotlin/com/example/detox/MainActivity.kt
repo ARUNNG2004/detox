@@ -17,6 +17,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.example.detox/detox_service"
     private val OVERLAY_PERMISSION_REQ_CODE = 1234
+    private val USAGE_STATS_PERMISSION_REQ_CODE = 1235
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -24,19 +25,34 @@ class MainActivity: FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "isOverlayPermissionGranted" -> {
-                    result.success(Settings.canDrawOverlays(this))
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        // For Android 12+, check PACKAGE_USAGE_STATS instead
+                        val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+                        val mode = appOps.checkOpNoThrow(
+                            AppOpsManager.OPSTR_GET_USAGE_STATS,
+                            android.os.Process.myUid(),
+                            packageName
+                        )
+                        result.success(mode == AppOpsManager.MODE_ALLOWED)
+                    } else {
+                        result.success(Settings.canDrawOverlays(this))
+                    }
                 }
                 "requestOverlayPermission" -> {
-                    if (!Settings.canDrawOverlays(this)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        // For Android 12+, request PACKAGE_USAGE_STATS
+                        startActivityForResult(
+                            Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
+                            USAGE_STATS_PERMISSION_REQ_CODE
+                        )
+                    } else {
                         val intent = Intent(
                             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${packageName}")
+                            Uri.parse("package:$packageName")
                         )
                         startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE)
-                        result.success(null)
-                    } else {
-                        result.success(true)
                     }
+                    result.success(null)
                 }
                 "isAccessibilityServiceEnabled" -> {
                     result.success(DetoxAccessibilityService.isAccessibilityServiceEnabled(this))
@@ -93,10 +109,24 @@ class MainActivity: FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == OVERLAY_PERMISSION_REQ_CODE) {
-            if (Settings.canDrawOverlays(this)) {
-                MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger!!, CHANNEL)
-                    .invokeMethod("onOverlayPermissionResult", true)
+        when (requestCode) {
+            OVERLAY_PERMISSION_REQ_CODE -> {
+                if (Settings.canDrawOverlays(this)) {
+                    MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger!!, CHANNEL)
+                        .invokeMethod("onOverlayPermissionResult", true)
+                }
+            }
+            USAGE_STATS_PERMISSION_REQ_CODE -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val appOps = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+                    val mode = appOps.checkOpNoThrow(
+                        AppOpsManager.OPSTR_GET_USAGE_STATS,
+                        android.os.Process.myUid(),
+                        packageName
+                    )
+                    MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger!!, CHANNEL)
+                        .invokeMethod("onOverlayPermissionResult", mode == AppOpsManager.MODE_ALLOWED)
+                }
             }
         }
     }

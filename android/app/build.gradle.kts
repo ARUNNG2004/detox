@@ -19,16 +19,48 @@ val flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "
 
 android {
     namespace = "com.example.detox"
-    compileSdk = 35
-    ndkVersion = "27.0.12077973"
+    compileSdk = 34
+    ndkVersion = "25.1.8937393"
 
     defaultConfig {
-        applicationId = "com.example.app"
+        applicationId = "com.example.detox"
         minSdk = 24
         targetSdk = 34
         versionCode = flutterVersionCode
         versionName = flutterVersionName
-        resValue("string", "privacy_policy_url", "https://your-domain.com/privacy-policy")
+
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.example.detox"
+    }
+
+    signingConfigs {
+        create("release") {
+            if (System.getenv("KEYSTORE_PASSWORD") != null) {
+                storeFile = file("keystore/release.keystore")
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            signingConfig = if (System.getenv("KEYSTORE_PASSWORD") != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
+        debug {
+            applicationIdSuffix = ".debug"
+            isDebuggable = true
+        }
     }
 
     compileOptions {
@@ -39,18 +71,6 @@ android {
 
     kotlinOptions {
         jvmTarget = "11"
-    }
-
-    buildTypes {
-        getByName("release") {
-            signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
     }
 }
 

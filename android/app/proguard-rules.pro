@@ -1,0 +1,6 @@
+-keep class com.example.detox.** { *; }
+-keepclassmembers class com.example.detox.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn sun.misc.**
+-dontwarn android.app.**

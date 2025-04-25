@@ -18,8 +18,6 @@ class BlackoutScreen extends StatefulWidget {
 class _BlackoutScreenState extends State<BlackoutScreen> with WidgetsBindingObserver {
   Timer? _timer;
   Duration _remainingTime = Duration.zero;
-  int _tapCount = 0;
-  Timer? _tapTimer;
 
   @override
   void initState() {
@@ -66,7 +64,6 @@ class _BlackoutScreenState extends State<BlackoutScreen> with WidgetsBindingObse
 
   Future<void> _stopDetoxSession({bool sessionEndedNormally = false}) async {
     _timer?.cancel();
-    _tapTimer?.cancel();
 
     // Stop screen pinning
     await DetoxService.stopScreenPinning();
@@ -89,29 +86,6 @@ class _BlackoutScreenState extends State<BlackoutScreen> with WidgetsBindingObse
     }
   }
 
-  void _handleTap() {
-    _tapCount++;
-    _tapTimer?.cancel(); // Cancel previous timer if taps are close
-
-    if (_tapCount >= 5) {
-      print("Emergency exit triggered!");
-      _tapCount = 0;
-      _stopDetoxSession(sessionEndedNormally: false);
-    } else {
-      // Reset tap count if taps are too far apart (e.g., > 2 seconds)
-      _tapTimer = Timer(const Duration(seconds: 2), () {
-        print("Tap timer expired, resetting count.");
-        if (mounted) {
-          setState(() {
-            _tapCount = 0;
-          });
-        }
-      });
-    }
-     // Debug print
-     // print("Tap count: $_tapCount");
-  }
-
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final hours = twoDigits(duration.inHours);
@@ -125,7 +99,6 @@ class _BlackoutScreenState extends State<BlackoutScreen> with WidgetsBindingObse
   @override
   void dispose() {
     _timer?.cancel();
-    _tapTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Ensure UI mode is restored if screen is disposed unexpectedly
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -137,36 +110,27 @@ class _BlackoutScreenState extends State<BlackoutScreen> with WidgetsBindingObse
     // WillPopScope prevents back button navigation
     return WillPopScope(
       onWillPop: () async => false, // Disable back button
-      child: GestureDetector(
-        onTap: _handleTap, // Detect taps anywhere on the screen
-        behavior: HitTestBehavior.opaque, // Ensure GestureDetector covers the whole screen
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _formatDuration(_remainingTime),
-                  style: const TextStyle(
-                    fontSize: 60,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontFeatures: [FontFeature.tabularFigures()], // Helps prevent text jumping
-                  ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _formatDuration(_remainingTime),
+                style: const TextStyle(
+                  fontSize: 60,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Detox session ends at ${DateFormat.jm().format(widget.endTime)}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-                 const SizedBox(height: 50),
-                 const Text(
-                  '(Tap 5 times rapidly for emergency exit)',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Detox session ends at ${DateFormat.jm().format(widget.endTime)}',
+                style: const TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+            ],
           ),
         ),
       ),

@@ -1,27 +1,27 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Reorder and group permissions -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Declare permissions with proper protection levels -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
+        android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Add permission group and protection level -->
-    <permission-group
-        android:name="${applicationId}.permission-group"
-        android:description="@string/permission_group_description"
-        android:label="@string/permission_group_label" />
+    <!-- Use SYSTEM_ALERT_WINDOW alternative for Android 12+ -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"
+        android:maxSdkVersion="31" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
 
-    <permission
-        android:name="${applicationId}.ACCESSIBILITY_SERVICE"
-        android:protectionLevel="signature"
-        android:label="@string/accessibility_permission_label"
-        android:description="@string/accessibility_permission_description" />
     <application
-        android:label="detox"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:enableOnBackInvokedCallback="true"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        tools:targetApi="31">
         <activity
             android:name=".MainActivity"
             android:exported="true"
